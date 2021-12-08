@@ -1,0 +1,104 @@
+//**************************************************************
+void trapBuildSymAcc(float Disp_rad, float Vplat, float Acc)
+{
+  float tAcc = Vplat / Acc;
+  float dAcc = Vplat * tAcc;
+  float dPlat = Disp_rad - dAcc;
+  float tPlat = dPlat / Vplat;
+
+  trapAccT = Acc; // acceleration rate
+  accT = int(round(tAcc / TSAMP)); // time duration of acceleration
+  platT = int(round(tPlat / TSAMP)); // time duration of constant speed
+  float dTrap = (accT + platT) * TSAMP * Vplat; // total displacement during trapezoid profile
+
+    Serial.println();
+    Serial.print("tAcc = ");  Serial.println(tAcc);
+    Serial.print("dAcc = ");  Serial.println(dAcc);
+    Serial.print("dPlat = "); Serial.println(dPlat);
+    Serial.print("tPlat = "); Serial.println(tPlat);
+    Serial.print("accT = ");  Serial.println(accT);
+    Serial.print("platT = "); Serial.println(platT);
+    Serial.print("dTrap = "); Serial.println(dTrap);
+}
+
+//*********************************************************************
+void trapRefVel(float specDisp_rad, float specVel, float specAcc, int Ncycles) // trap velocity profile
+{
+  if (!oldProfileEn && isProfileEn)
+  {
+    refAccT = 0.0;
+    refVelT = 0.0;
+    refPosT = 0.0;
+    //specDisp_rad = 300.0; specVel = 150.0; specAcc = 800.0;
+    trapBuildSymAcc(specDisp_rad, specVel, specAcc);
+    dwellStartT = 1; dwellEndT = 1; specVdist = 0.0;
+
+    //specDisp_rad = 300.0, specVel = 100.0, specAcc = 200.0;
+    //trapBuildSymAcc(specDisp_rad, specVel, specAcc);
+    //dwellStartT = 50, dwellEndT = 200; specVdist = 2.0;
+
+    //specDisp_rad = 206.9, specVel = 110.0, specAcc = 180.0;
+    //trapBuildSymAcc(specDisp_rad, specVel, specAcc);
+    //dwellGoT = 300, dwellUpT = 500, dwellEndT = 200; specVdist = abs(V_DIST);
+
+    // Times when speed changes
+    T0 = dwellStartT;
+    T1 = T0 + accT; T2 = T1 + platT; T3 = T2 + accT; T4 = T3 + dwellEndT;
+    T5 = T4 + accT; T6 = T5 + platT; T7 = T6 + accT; T8 = T7 + dwellEndT;
+
+    //T0 = dwellGoT;
+    //T1 = T0 + accT, T2 = T1 + platT, T3 = T2 + accT, T4 = T3 + dwellUpT;
+    //T5 = T4 + accT, T6 = T5 + platT, T7 = T6 + accT, T8 = T7 + dwellEndT;
+
+    // Times when disturbances are applied and values
+    D1 = T3 + 100; D2 = D1 + 200;
+    dD1 = specVdist; dD2 = -specVdist;
+
+    //simJumpOn_simJumpOff();
+    //simJumpOn_simFileOff();
+    //weightOn_simJumpOff();
+    //weightOn_simFileOff();
+  }
+  tick = timeElapsedTicks % T8; //modulo allows rerunning of profile. Remove for single run.
+  
+  // ---- Command profile -------------------------------------
+  oldProfileEn = isProfileEn;
+  if (tick < T0)       refAccT = 0.0;
+  else if (tick < T1)  refAccT = dir * trapAccT;
+  else if (tick < T2)  refAccT = 0.0;
+  else if (tick < T3)  refAccT = -dir * trapAccT;
+  else if (tick < T4)  refAccT = 0.0;
+  //else if (tick == T4) isProfileEn = false;
+
+  else if (tick < T5)  refAccT = -dir * trapAccT;
+  else if (tick < T6)  refAccT = 0.0;
+  else if (tick < T7)  refAccT = dir * trapAccT;
+  else if (tick < T8)  refAccT = 0.0;
+  else if (tick == T8) isProfileEn = false;
+
+  //---- Disturbance profile -----------------------------------
+  if (tick < D1) Vdist = 0.0;
+  else if (tick == D1) Vdist += dD1 * specVdist; // module, sim load
+  else if (tick == D2) Vdist += dD2 * specVdist;
+  else if (tick == D3) Vdist += dD3 * specVdist;
+  else if (tick == D4) Vdist += dD4 * specVdist;
+  else if (tick == D5) Vdist += dD5 * specVdist;
+  else if (tick == D6) Vdist += dD6 * specVdist;
+  else if (tick == D7) Vdist += dD7 * specVdist;
+  else if (tick == D8) Vdist += dD8 * specVdist;
+
+  //---- Profile integration -----------------------------------
+  if (isProfileEn) {
+    refVelT += refAccT * TSAMP;
+    refPosT += refVelT * TSAMP;
+  }
+  else {
+    refAccT = 0.0;
+    refVelT = 0.0;
+    refPosT = 0.0;
+  }
+
+  isShowStats = (oldProfileEn && !isProfileEn);
+  if ((timeElapsedTicks/T8)>=Ncycles) {isProfileEn=false; isModuleEn=false;}; // stop after 4 profiles
+
+}
