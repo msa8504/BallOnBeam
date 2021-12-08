@@ -1,0 +1,51 @@
+/*
+   PI CLASS DEFINITIONS
+*/
+class CONTROLLERS {
+  private:
+    float TSAMP;
+    float PZ_yd = 0, PZ_ypd = 0;
+    float PD_yd = 0, PD_ypd = 0;
+    float LEAD_yd = 0, LEAD_ypd = 0;
+    float PI_integralError = 0;
+    float PID_derivative_term = 0, PID_term1 = 0, PID_integral_term = 0;
+
+  public:
+    // PI_compensator(float* errorIn, float* Kp, float* Ki, const float* TSAMP, boolean* saturatedActuator) {
+    CONTROLLERS(const float* TSAMP) {
+      this->TSAMP = *TSAMP;
+    }
+
+    float U_PZ(float input, float c, float d)
+    {
+      // pole zero compensator (s+c)/(s+d)
+      // Implement (s+c)/(s+d) as 1 + (c-d)/(s+d).
+      PZ_yd += ((c - d) * input - d * PZ_yd) * TSAMP;
+      PZ_ypd = input + PZ_yd;
+      return PZ_ypd;
+    }
+
+    float U_LEAD(float input, float alpha, float T) {
+      // lead compensator (T*s+1)/(alpha*T*s+1)
+      // implement as (d/c) (s+c)/(s+d) where c=1/T, d=1/alpha*T
+      // Implement (s+c)/(s+d) as 1 + (c-d)/(s+d).
+      float c = 1 / T;
+      float d = 1 / (alpha * T);
+      LEAD_yd += ((c - d) * input - d * LEAD_yd) * TSAMP;
+      LEAD_ypd = input + LEAD_yd;
+      LEAD_ypd = LEAD_ypd / alpha;
+      return LEAD_ypd;
+    }\
+    
+
+    float U_PID(float errorIn, float Kp, float Ki, float Kd, float Derivative_cutoff_freq_rps, boolean saturatedActuator)
+    {// proportional plus integral plus derivative compensator. Derivative is bandwidth limited.
+      PID_derivative_term = (errorIn - PID_term1) * Derivative_cutoff_freq_rps;
+      PID_term1 += PID_derivative_term * TSAMP;
+      //integral part
+      if (!saturatedActuator) {
+        PID_integral_term += errorIn * TSAMP;
+      };
+      return Kp * errorIn + Ki * PID_integral_term + Kd * PID_derivative_term    ;
+    }
+};
