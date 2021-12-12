@@ -36,7 +36,7 @@ const float VOLTS_PER_PWM = 5.0 / 255.0; // motor drive voltage per pwm command
 const float PWM_PER_VOLT = 1 / VOLTS_PER_PWM; // pwm value to achieve 1 volt output
 const float RADPERSEC_PERVOLT = 356.0; // from datasheet calculations
 
-float Varm = 0, Vff = 0;
+float Varm = 0, Vff = 0, oldballDis = 0;
 float mtrVel = 0.0, errVel = 0.0, errPos = 0.0, errDist = 0.0;
 float refAcc = 0.0, refVel = 0.0, refPos = 0.0, refDist = 190.0;
 float refAccT = 0.0, refVelT = 0.0, refPosT = 0.0, refDistT = 200.0;
@@ -147,21 +147,30 @@ void loop()
   
   if (isModuleEn) {
     isProfileEn = true;
+    
+     ballDisfil = 0.95*ballDis + 0.05*ballDisfil; 
+    pastballDis = ballDisfil;
+   
+    if (abs(ballDisfil - oldballDis) < 4){
+      ballDisfil = oldballDis;}
+    else{
+      oldballDis = ballDisfil;}
+      ballDis = oldballDis;
 
     
     calculateError(); // errDist
 
-    if(errDist > -8 && errDist < 8){
+    if(errDist > -12 && errDist < 12){
       digitalWrite(8,LOW);
       digitalWrite(9,HIGH);
       digitalWrite(10,LOW);
     }
-    if(errDist < -8){
+    if(errDist < -12){
       digitalWrite(8,LOW);
       digitalWrite(9,LOW);
       digitalWrite(10,HIGH);
     }
-       if(errDist > 8){
+       if(errDist > 12){
       digitalWrite(8,HIGH);
       digitalWrite(9,LOW);
       digitalWrite(10,LOW);
@@ -170,19 +179,19 @@ void loop()
 
 
     
-    refballvel = Gc_ballDist.U_PID(errDist, 0.07, 0, .007, 10, saturatedMtrPosActuator);
+    refballvel = Gc_ballDist.U_PID(errDist, 0.015, 0.005, .004, 10, saturatedMtrPosActuator);
     refballvel = constrain(refballvel, -2, 2);
     //refPos = constrain(refPosUnconstrained, GEAR_RATIO * 0.3, GEAR_RATIO * 1.5); // limit motor position range (in radians) at output shaft
     
     checkForSaturatedMtrPosActuator();  //saturatedMtrPosActuator=true;  // TO OVERRIDE 
 
-    ballDisfil = 0.2*ballDis + 0.8*ballDisfil; 
-    vball = 0.001*(ballDisfil - pastballDis)/TSAMP;
-    pastballDis = ballDisfil;
+//    ballDisfil = 0.2*ballDis + 0.8*ballDisfil; 
+      vball = 0.001*(ballDisfil - pastballDis)/TSAMP;
+//    pastballDis = ballDisfil;
 
     float errballvel = (refballvel - vball);
 
-    refPosUnconstrained = 100 - Gc_ballVelocity.U_PID(errballvel, 23, 1, 0, 20, saturatedMtrPosActuator);
+    refPosUnconstrained = 100 - Gc_ballVelocity.U_PID(errballvel, 30, 2, 0, 20, saturatedMtrPosActuator);
     
     
     //refPos=50;// Use only for tuning of position loop,
@@ -315,16 +324,16 @@ void printResults(void)
   {
     //print header
 //    Serial.print("time"); Serial.print("\t");
-//    Serial.print("mtrVel"); Serial.print("\t");
-//    Serial.print("mtrPos"); Serial.print("\t");
+    //Serial.print("mtrVel"); Serial.print("\t");
+    //Serial.print("mtrPos"); Serial.print("\t");
 //    //Serial.print("pwm_command: () "); Serial.print("\t");
 //    Serial.print("Varm"); Serial.print("\t");
-//    //Serial.print("refVel"); Serial.print("\t");
-//    Serial.print("refballvel"); Serial.print("\t");
-//    Serial.print("refPos"); Serial.print("\t");
-//    Serial.print("refDist"); Serial.print("\t");
-//    Serial.print("ballDis"); Serial.print("\t");
-//    //Serial.print("errDist");Serial.print("\t"); 
+//Serial.print("refVel"); Serial.print("\t");
+    //Serial.print("refballvel"); Serial.print("\t");
+ //Serial.print("refPos"); Serial.print("\t");
+ Serial.print("refDist"); Serial.print("\t");
+ Serial.print("ballDis"); Serial.print("\t");
+ Serial.print("errDist");Serial.print("\t"); 
 //    Serial.print("vball");Serial.print("\t");
 //    Serial.print("satAct");
 //    Serial.println();
@@ -332,16 +341,16 @@ void printResults(void)
     lastmtrPos = mtrPos;
   }
 //  Serial.print(timeElapsedTicks * TSAMP_MSEC); Serial.print("\t");
-//  Serial.print(mtrVel); Serial.print("\t");
-//  Serial.print(mtrPos); Serial.print("\t");
+// Serial.print(mtrVel); Serial.print("\t");
+ //Serial.print(mtrPos); Serial.print("\t");
 //  //Serial.print(pwm_value_commanded); Serial.print("\t");
 //  Serial.print(Varm); Serial.print("\t");
-//  //Serial.print(refVel); Serial.print("\t");
-//   Serial.print(refballvel); Serial.print("\t");
-//  Serial.print(refPos); Serial.print("\t");
-//  Serial.print(refDist); Serial.print("\t");
-//  Serial.print(ballDis); Serial.print("\t");
-//  //Serial.print(errDist);Serial.print("\t");
+//Serial.print(refVel); Serial.print("\t");
+  //Serial.print(refballvel); Serial.print("\t");
+  //Serial.print(refPos); Serial.print("\t");
+ Serial.print(refDist); Serial.print("\t");
+ Serial.print(ballDis); Serial.print("\t");
+ Serial.print(errDist);Serial.print("\t");
 //  Serial.print(vball);Serial.print("\t");
 //  Serial.print(saturatedMtrPosActuator);
   Serial.println();
